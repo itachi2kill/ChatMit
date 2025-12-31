@@ -55,29 +55,31 @@ def handle_message(data):
     room_code = sender_info['room']
     original_text = data['message']
 
-    # Find ONLY users in the same room
+    # Find ONLY users in the same room (excluding sender)
     recipients = [sid for sid, info in users.items() if info['room'] == room_code and sid != sender_id]
 
-    # 1. Send to the sender (so they see their own message)
-    # We do this in JS, but backend confirmation is good.
-    # (Skipping here as your JS handles "mine" messages locally)
-
-    # 2. Loop through recipients in the same room
+    # Loop through recipients in the same room
     for recipient_id in recipients:
         recipient_data = users[recipient_id]
+        target_lang = recipient_data['lang']
+        
+        # 1. Fallback: Use original text first
+        translated_text = original_text 
+
+        # 2. Try to translate
         try:
-            target_lang = recipient_data['lang']
             translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
-            
-            emit('receive_message', {
-                'original': original_text,
-                'translation': translated_text,
-                'sender': sender_name,
-                'lang': target_lang
-            }, room=recipient_id)
-            
         except Exception as e:
+            # If translation fails, we print the error but CONTINUE to send the original text
             print(f"Error translating for {recipient_id}: {e}")
+
+        # 3. Send message (This is now OUTSIDE the try block)
+        emit('receive_message', {
+            'original': original_text,
+            'translation': translated_text,
+            'sender': sender_name,
+            'lang': target_lang
+        }, room=recipient_id)
 
 if __name__ == '__main__':
     print("✅ SERVER RUNNING: http://localhost:5001")
