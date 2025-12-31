@@ -25,7 +25,6 @@ def handle_disconnect():
         name = user['name']
         leave_room(room)
         del users[request.sid]
-        # Notify others in that room
         emit('system_message', {'message': f'{name} has left the chat.'}, to=room)
 
 @socketio.on('join_chat')
@@ -34,13 +33,8 @@ def handle_join(data):
     room_code = data.get('room', 'default')
     lang = data.get('lang', 'en')
     
-    # Save user info
     users[request.sid] = { 'name': username, 'lang': lang, 'room': room_code }
-    
-    # Connect user to the specific room
     join_room(room_code)
-    
-    # Broadcast ONLY to that room
     emit('system_message', {'message': f'{username} has joined room {room_code}.'}, to=room_code)
 
 @socketio.on('send_message')
@@ -55,25 +49,24 @@ def handle_message(data):
     room_code = sender_info['room']
     original_text = data['message']
 
-    # Find ONLY users in the same room (excluding sender)
+    # Get all users in the same room (except sender)
     recipients = [sid for sid, info in users.items() if info['room'] == room_code and sid != sender_id]
 
-    # Loop through recipients in the same room
     for recipient_id in recipients:
         recipient_data = users[recipient_id]
         target_lang = recipient_data['lang']
         
-        # 1. Fallback: Use original text first
+        # 1. Default to original text (Fallback)
         translated_text = original_text 
 
         # 2. Try to translate
         try:
             translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
         except Exception as e:
-            # If translation fails, we print the error but CONTINUE to send the original text
             print(f"Error translating for {recipient_id}: {e}")
+            # Even if error happens, we continue because translated_text is already set to original_text
 
-        # 3. Send message (This is now OUTSIDE the try block)
+        # 3. Send message (This MUST be outside the try/except block)
         emit('receive_message', {
             'original': original_text,
             'translation': translated_text,
