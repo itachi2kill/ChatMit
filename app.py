@@ -1,12 +1,18 @@
+# 1. ADD THESE TWO LINES AT THE VERY TOP
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from deep_translator import GoogleTranslator
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Store user data: { socket_id: { 'name': 'Rahul', 'lang': 'en', 'room': '123' } }
+# 2. ALLOW ALL ORIGINS FOR RENDER
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 users = {}
 
 @app.route('/')
@@ -15,7 +21,7 @@ def index():
 
 @socketio.on('connect')
 def handle_connect():
-    print(f"User Connected: {request.sid}")
+    print(f"✅ NEW CONNECTION: {request.sid}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -25,6 +31,7 @@ def handle_disconnect():
         name = user['name']
         leave_room(room)
         del users[request.sid]
+        print(f"❌ DISCONNECTED: {name}")
         emit('system_message', {'message': f'{name} has left the chat.'}, to=room)
 
 @socketio.on('join_chat')
@@ -35,7 +42,10 @@ def handle_join(data):
     
     users[request.sid] = { 'name': username, 'lang': lang, 'room': room_code }
     join_room(room_code)
+    
+    # Broadcast to room so you know they are there
     emit('system_message', {'message': f'{username} has joined room {room_code}.'}, to=room_code)
+    print(f"📢 {username} joined Room {room_code}")
 
 @socketio.on('send_message')
 def handle_message(data):
@@ -43,30 +53,32 @@ def handle_message(data):
     sender_info = users.get(sender_id)
     
     if not sender_info:
+        # If server forgot user, force them to refresh
+        print(f"⚠️ ERROR: User {sender_id} not found in memory.")
         return 
 
     sender_name = sender_info['name']
     room_code = sender_info['room']
     original_text = data['message']
 
-    # Get all users in the same room (except sender)
     recipients = [sid for sid, info in users.items() if info['room'] == room_code and sid != sender_id]
+
+    # DEBUG LOG
+    print(f"📨 Message from {sender_name} to {len(recipients)} people in Room {room_code}")
 
     for recipient_id in recipients:
         recipient_data = users[recipient_id]
         target_lang = recipient_data['lang']
         
-        # 1. Default to original text (Fallback)
+        # Default fallback
         translated_text = original_text 
 
-        # 2. Try to translate
         try:
             translated_text = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
         except Exception as e:
-            print(f"Error translating for {recipient_id}: {e}")
-            # Even if error happens, we continue because translated_text is already set to original_text
+            print(f"⚠️ Translation Error: {e}")
 
-        # 3. Send message (This MUST be outside the try/except block)
+        # Send Message OUTSIDE the try block
         emit('receive_message', {
             'original': original_text,
             'translation': translated_text,
@@ -75,5 +87,4 @@ def handle_message(data):
         }, room=recipient_id)
 
 if __name__ == '__main__':
-    print("✅ SERVER RUNNING: http://localhost:5001")
-    socketio.run(app, host='0.0.0.0', port=5001)
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 5001)))
