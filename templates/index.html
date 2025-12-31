@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatMit</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>Welcome</h2>
+            <p>Enter your details to join</p>
+            
+            <input type="text" id="usernameInput" placeholder="Your Name (e.g. Rahul)" />
+            
+            <input type="text" id="roomInput" placeholder="Room Code (e.g. 101)" />
+            
+            <label>I speak:</label>
+            <select id="loginLangSelect">
+                <option value="en">English</option>
+                <option value="my">Burmese (မြန်မာ)</option>
+                <option value="hi">Hindi (हिंदी)</option>
+                <option value="es">Spanish (Español)</option>
+                <option value="fr">French (Français)</option>
+                <option value="ja">Japanese (日本語)</option>
+                <option value="zh-CN">Chinese (Simplified)</option>
+            </select>
+            
+            <button onclick="joinChat()">Join Room</button>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <h3>ChatMit</h3>
+            <span id="roomDisplay" style="font-size: 11px; color: #bbb; margin-top: 2px;">Waiting to join...</span>
+        </div>
+
+        <div id="messages"></div>
+
+        <div class="input-area">
+            <input id="messageInput" type="text" placeholder="Message..." onkeypress="handleEnter(event)" />
+            <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
